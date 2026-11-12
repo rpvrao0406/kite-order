@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kite Order</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f5f6f8;color:#222}
+  .wrap{max-width:420px;margin:0 auto;padding:20px}
+  h1{font-size:18px;margin:0 0 14px}
+  .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:15px}
+  .row:last-child{border-bottom:0}
+  .lbl{color:#777}
+  .val{font-weight:600}
+  .buy{color:#1a7f37}.sell{color:#cf222e}
+  button{width:100%;padding:16px;font-size:18px;font-weight:700;border:0;border-radius:10px;color:#fff;cursor:pointer}
+  .b-buy{background:#1a73e8}.b-sell{background:#f05a28}
+  .warn{font-size:13px;color:#8a6d00;background:#fff8e1;border-radius:8px;padding:10px;margin-top:12px}
+  .err{color:#cf222e;font-weight:600}
+  label{display:block;font-size:13px;color:#555;margin-top:10px}
+  input,select{width:100%;padding:10px;font-size:15px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
+  .small{font-size:12px;color:#888;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kite Order</h1>
+
+  <div class="card" id="orderCard" style="display:none">
+    <div class="row"><span class="lbl">Action</span><span class="val" id="vSide"></span></div>
+    <div class="row"><span class="lbl">Contract</span><span class="val" id="vSym"></span></div>
+    <div class="row"><span class="lbl">Exchange</span><span class="val" id="vExch"></span></div>
+    <div class="row"><span class="lbl">Quantity</span><span class="val" id="vQty"></span></div>
+    <div class="row"><span class="lbl">Product</span><span class="val" id="vProd"></span></div>
+    <div class="row"><span class="lbl">Order type</span><span class="val">LIMIT</span></div>
+    <div class="row"><span class="lbl">Limit price</span><span class="val" id="vPrice"></span></div>
+    <div style="margin-top:16px"><button id="goBtn">Open in Kite</button></div>
+    <div class="warn">Kite will open with this order filled in. Check every field, then tap <b>Place</b> in Kite. Nothing is placed until you do.</div>
+  </div>
+
+  <div class="card" id="emptyCard">
+    <div id="msg">No order in this link. Build one below.</div>
+    <label>Action</label>
+    <select id="fSide"><option>BUY</option><option>SELL</option></select>
+    <label>Trading symbol (e.g. NIFTY26N1725350CE)</label>
+    <input id="fSym" autocapitalize="characters">
+    <label>Quantity</label>
+    <input id="fQty" type="number" value="65">
+    <label>Limit price</label>
+    <input id="fPrice" type="number" step="0.05">
+    <label>Product</label>
+    <select id="fProd"><option>MIS</option><option>NRML</option></select>
+    <div style="margin-top:14px"><button class="b-buy" id="buildBtn">Show order</button></div>
+    <div class="small">Link format: #SIDE-SYMBOL-QTY-PRICE-PRODUCT, e.g. #SELL-NIFTY26N1725350CE-65-235.65-MIS</div>
+  </div>
+</div>
+
+<form id="kiteForm" method="post" action="https://kite.zerodha.com/connect/basket">
+  <input type="hidden" name="api_key" value="ogfqtu0fsy8pmifp">
+  <input type="hidden" name="data" id="kiteData">
+</form>
+
+<script>
+function exchangeFor(sym){ return /^SENSEX|^BANKEX/.test(sym) ? 'BFO' : 'NFO'; }
+
+function parseHash(){
+  var h = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if(!h) return null;
+  var p = h.split('-');
+  if(p.length < 5) return {error:'Link is incomplete.'};
+  var side = p[0].toUpperCase(), sym = p[1].toUpperCase(),
+      qty = parseInt(p[2],10), price = parseFloat(p[3]), prod = p[4].toUpperCase();
+  if(side!=='BUY' && side!=='SELL') return {error:'Action must be BUY or SELL.'};
+  if(!/^[A-Z0-9]+$/.test(sym)) return {error:'Bad trading symbol.'};
+  if(!(qty>0)) return {error:'Bad quantity.'};
+  if(!(price>0)) return {error:'Bad price.'};
+  if(prod!=='MIS' && prod!=='NRML') return {error:'Product must be MIS or NRML.'};
+  return {side:side, sym:sym, qty:qty, price:price, prod:prod, exch:exchangeFor(sym)};
+}
+
+function render(){
+  var o = parseHash();
+  var card = document.getElementById('orderCard'), empty = document.getElementById('emptyCard');
+  if(!o){ card.style.display='none'; empty.style.display='block'; return; }
+  if(o.error){
+    card.style.display='none'; empty.style.display='block';
+    document.getElementById('msg').innerHTML = '<span class="err">'+o.error+'</span> Build the order below.';
+    return;
+  }
+  empty.style.display='none'; card.style.display='block';
+  var s = document.getElementById('vSide');
+  s.textContent = o.side; s.className = 'val ' + (o.side==='BUY'?'buy':'sell');
+  document.getElementById('vSym').textContent = o.sym;
+  document.getElementById('vExch').textContent = o.exch;
+  document.getElementById('vQty').textContent = o.qty;
+  document.getElementById('vProd').textContent = o.prod;
+  document.getElementById('vPrice').textContent = '₹' + o.price.toFixed(2);
+  var b = document.getElementById('goBtn');
+  b.textContent = 'Open ' + o.side + ' in Kite';
+  b.className = o.side==='BUY' ? 'b-buy' : 'b-sell';
+  b.onclick = function(){
+    var basket = [{
+      variety:'regular', tradingsymbol:o.sym, exchange:o.exch,
+      transaction_type:o.side, order_type:'LIMIT', product:o.prod,
+      quantity:o.qty, price:o.price, readonly:false
+    }];
+    document.getElementById('kiteData').value = JSON.stringify(basket);
+    document.getElementById('kiteForm').submit();
+  };
+}
+
+document.getElementById('buildBtn').onclick = function(){
+  var side=document.getElementById('fSide').value,
+      sym=document.getElementById('fSym').value.trim().toUpperCase(),
+      qty=document.getElementById('fQty').value,
+      price=document.getElementById('fPrice').value,
+      prod=document.getElementById('fProd').value;
+  location.hash = [side,sym,qty,price,prod].join('-');
+};
+
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body>
+</html>
